@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Backend", "Backend.vcxproj", "{EBC41BB3-0AD7-4D78-995C-7320C0F9074B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DBConnection", "DBConnection\DBConnection.vcxproj", "{D00EE40A-064E-411E-A247-9EAB31383DB4}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FileProcessor", "FileProcessor\FileProcessor.vcxproj", "{99AF7067-19F2-42D3-BD06-75C1D6BA8E05}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EBC41BB3-0AD7-4D78-995C-7320C0F9074B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{EBC41BB3-0AD7-4D78-995C-7320C0F9074B}.Debug|Win32.Build.0 = Debug|Win32
+		{EBC41BB3-0AD7-4D78-995C-7320C0F9074B}.Release|Win32.ActiveCfg = Release|Win32
+		{EBC41BB3-0AD7-4D78-995C-7320C0F9074B}.Release|Win32.Build.0 = Release|Win32
+		{D00EE40A-064E-411E-A247-9EAB31383DB4}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D00EE40A-064E-411E-A247-9EAB31383DB4}.Debug|Win32.Build.0 = Debug|Win32
+		{D00EE40A-064E-411E-A247-9EAB31383DB4}.Release|Win32.ActiveCfg = Release|Win32
+		{D00EE40A-064E-411E-A247-9EAB31383DB4}.Release|Win32.Build.0 = Release|Win32
+		{99AF7067-19F2-42D3-BD06-75C1D6BA8E05}.Debug|Win32.ActiveCfg = Debug|Win32
+		{99AF7067-19F2-42D3-BD06-75C1D6BA8E05}.Debug|Win32.Build.0 = Debug|Win32
+		{99AF7067-19F2-42D3-BD06-75C1D6BA8E05}.Release|Win32.ActiveCfg = Release|Win32
+		{99AF7067-19F2-42D3-BD06-75C1D6BA8E05}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
