@@ -63,9 +63,9 @@ BEGIN
 	FROM archivo_procesado 
 	WHERE ap_procesado = 'N'
 	AND ap_archivo = 'TRANSFER'
-	and SUBSTRING(ap_string,1,1) = '2'
+	and SUBSTRING(ap_string,1,1) = '2' --Aca estoy filtrando los header y footer
 	ORDER BY ap_id asc
-	
+
 	WHILE (1=1)
 	BEGIN
 		INSERT INTO dn_tef_recibidas
@@ -125,6 +125,7 @@ BEGIN
 
 		SET @aux = NULL
 
+		--Hay que corregir este break porque me inserta una fila de nulls
 		SELECT top 1 @aux = ap_string, @id = ap_id
 		FROM archivo_procesado 
 		WHERE ap_procesado = 'N'
@@ -132,7 +133,7 @@ BEGIN
 		and SUBSTRING(ap_string,1,1) = '2'
 		ORDER BY ap_id asc
 		
-		IF @aux IS NULL BREAK
+		IF @@ROWCOUNT = 0 BREAK
 	END
 END
 
@@ -142,7 +143,8 @@ GO
 IF object_id('sp_batch_process') IS NOT NULL
     DROP PROCEDURE sp_batch_process
 GO
-CREATE PROCEDURE sp_batch_process( @proceso varchar(100) )
+CREATE PROCEDURE sp_batch_process
+--( @proceso varchar(100) ) FALTA GENERALIZAR los procesos
 AS
 BEGIN
 	DECLARE
@@ -160,7 +162,8 @@ BEGIN
 	--Me fijo en la tabla de logeo si ya hice alguno hoy
 	SELECT @subproceso = lp_subproceso, @query = lp_query
 	FROM log_procesos_ejecutados
-	WHERE lp_proceso = @proceso
+	--WHERE lp_proceso = @proceso
+	WHERE lp_proceso = 'TRANSFER'
 	AND CAST(lp_fecha_ejecucion AS DATE) = CAST(GETDATE() as DATE)
 
 	--Busco el total para escribir menos
@@ -190,7 +193,8 @@ BEGIN
 
 			--Logeo la operacion
 			INSERT INTO log_procesos_ejecutados 
-			VALUES (@proceso,@subproceso,@query,GETDATE())
+			--VALUES (@proceso,@subproceso,@query,GETDATE())
+			VALUES ('TRANSFER',@subproceso,@query,GETDATE())
 
 			--Me fijo si tengo que cortar
 			IF @total = @actual BREAK
@@ -398,7 +402,8 @@ BEGIN
 --------------------------------------------------------------------------------------------
 
 	-- Terminada la conciliacion, largo el proceso para generar los movimientos que se van a enviar al CORE
-	EXEC sp_batch_process_conciliacion
+	-- no deberia estar hardcodeado, deberia estar como otro subproceso
+	--EXEC sp_batch_process_conciliacion
 
 END
 GO
