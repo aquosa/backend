@@ -1,4 +1,8 @@
+use Batch
 
+IF object_id('fn_str_TO_BASE64') IS NOT NULL
+	DROP FUNCTION [dbo].[fn_str_TO_BASE64]
+	GO
 -- To Base64 string
 CREATE FUNCTION [dbo].[fn_str_TO_BASE64]
 (

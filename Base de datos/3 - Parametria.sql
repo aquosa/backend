@@ -1,7 +1,8 @@
 use Batch
 
 DECLARE @path varchar(255)
-SET @path = 'E:\\AQUOSA\\backend\\Backend\\Debug'
+--SET @path = 'E:\\AQUOSA\\backend\\Backend\\Debug'
+SET @path  = 'C:\\Banksys\\Batch\\input'
 
 --Borro datos de las tablas si ya existen
 TRUNCATE TABLE [dbo].[parametria_archivos_entrada_interbanking]
