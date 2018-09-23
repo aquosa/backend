@@ -380,3 +380,25 @@ CREATE TABLE parametria_tran_code(
 	pt_estado char default 'A',
 	pt_descripcion varchar(100)
 )
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES
+           WHERE TABLE_NAME = N'dn_offering')
+DROP TABLE dn_offering
+CREATE TABLE dn_offering(
+	[COD_ABONADO]	[char](7) NULL,
+	[CUENTA]		[char](13) NULL,
+	[COD_OFFERING]	[char](10) NULL
+)
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES
+           WHERE TABLE_NAME = N'dn_abonados_cuentas')
+DROP TABLE dn_abonados_cuentas
+CREATE TABLE dn_abonados_cuentas(
+	[COD_ABONADO]	[char](7) NULL,
+	[TIPO_CUENTA]	[char](2) NULL,
+	[CUENTA]		[char](19) NULL,
+	[COD_OFFERING]	[char](10) NULL,
+	[ACTIVA]		[char](1) NULL
+)

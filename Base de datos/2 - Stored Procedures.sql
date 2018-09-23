@@ -169,9 +169,10 @@ BEGIN
 	AND CAST(lp_fecha_ejecucion AS DATE) = CAST(GETDATE() as DATE)
 
 	--Busco el total para escribir menos
-	SELECT @total = count(*)
-	FROM planificacion_procesos_detalle
-	WHERE pp_estado = 'A'
+	SELECT	@total = count(*)
+	FROM	planificacion_procesos_detalle
+	WHERE	pp_estado = 'A'
+	AND		pp_proceso = 'TRANSFER'
 	GROUP BY pp_proceso
 
 	--No procese nada ni se rompio en el medio
@@ -181,11 +182,11 @@ BEGIN
 		BEGIN
 
 			--Busco en la tabla de proceso que es lo que tengo que hacer
-			SELECT top 1 @id = pp_id, @query = pp_query, @subproceso = pp_subproceso
-			FROM planificacion_procesos_detalle
-			WHERE pp_proceso = 'TRANSFER'
-			and pp_estado = 'A'
-			and pp_id > @actual
+			SELECT	top 1 @id = pp_id, @query = pp_query, @subproceso = pp_subproceso
+			FROM	planificacion_procesos_detalle
+			WHERE	pp_proceso = 'TRANSFER'
+			and		pp_estado = 'A'
+			and		pp_id > @actual
 			ORDER BY pp_id asc
 
 			--Corro el query que me traje
@@ -575,15 +576,15 @@ BEGIN
 												'000000',														--	chBLOCK_INI_TLF	0	000000
 												'HOST24',														--	PREFIX1	6	HOST24
 												'99',															--	PREFIX2	2	99
-												CONVERT(varchar,GETDATE(),112),									--	DAT_TIM	19	YYYYMMDD  
+												LEFT(SUBSTRING(CONVERT(varchar,GETDATE(),112),3,6)+'                   ' ,19),									--	DAT_TIM	19	YYYYMMDD  
 												'01',															--	REC_TYP	2	01
-												'H24',															--	AUTH_PPD	4	H24
-												'DPS',															--	TERM_LN	4	DPS 
-												BCO_DEBITO,														--	TERM_FIID	4	XXX
-												'0000000000000000',												--  TERM_ID	16	0000000000000000
-												'0000',															--	CARD_LN	4	0000
-												BCO_CREDITO,													--	CARD_FIID	4	XXX
-												'0000000000000000000000000000',									--  CARD_PAN	28	0000000000000000000000000000
+												'H24 ',															--	AUTH_PPD	4	H24
+												'DPS ',															--	TERM_LN	4	DPS 
+												RIGHT('0000' + BCO_DEBITO,4),														--	TERM_FIID	4	XXX
+												'DPS-GENERIC-01-N',												--  TERM_ID	16	0000000000000000
+												'DPS ',															--	CARD_LN	4	0000
+												RIGHT('0000' + BCO_CREDITO,4),													--	CARD_FIID	4	XXX
+												'DPS-GENERIC;9999999999999999',									--  CARD_PAN	28	0000000000000000000000000000
 												'000',															--	CARD_MBR_NUM	3	000
 												'0000',															--	BRCH_ID	4	0000
 												'0000',															--	REGN_ID	4	0000
@@ -593,12 +594,12 @@ BEGIN
 												'00',															--	RTE_STAT	2	00
 												'5',															--	ORIGINATOR	1	5
 												'5',															--	RESPONDER	1	5
-												CONVERT(varchar,GETDATE(),112),									--	ENTRY_TIM	19	YYYYMMDD 
+												LEFT(SUBSTRING(CONVERT(varchar,GETDATE(),112),3,6)+'                   ' ,19),									--	ENTRY_TIM	19	YYYYMMDD 
 												'0000000000000000000',											--	EXIT_TIM	19	0000000000000000000
 												'0000000000000000000',											--	RE_ENTRY_TIM	19	0000000000000000000
-												CONVERT(varchar,GETDATE(),112),									--	TRAN_DAT	6	YYMMDD 
-												'000000',														--	TRAN_TIM	8	000000
-												CONVERT(varchar,GETDATE(),112),									--	POST_DAT	6	YYMMDD
+												SUBSTRING(CONVERT(varchar,GETDATE(),112),3,6),									--	TRAN_DAT	6	YYMMDD 
+												'00000000',														--	TRAN_TIM	8	000000
+												SUBSTRING(CONVERT(varchar,GETDATE(),112),3,6),									--	POST_DAT	6	YYMMDD
 												'000000',														--	ACQ_ICHG_SETL_DAT	6	000000
 												'000000',														--	ISS_ICHG_SETL_DAT	6	000000
 												RIGHT('000000000000'+ISNULL(NRO_TRANSFERENCIA,''),12),			--	SEQ_NUM	12	000000000000
@@ -636,9 +637,11 @@ BEGIN
 												FILLER),														--	FILLER4	365	N + XXXX + XXX
 												NRO_TRANSFERENCIA
 					FROM dn_tef_a_enviar
+
 END
 GO
-
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
 IF object_id('sp_batch_MAC_transfer') IS NOT NULL
     DROP PROCEDURE sp_batch_MAC_transfer
 GO
@@ -648,7 +651,8 @@ BEGIN
 RETURN 0 
 END
 GO
-
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
 IF object_id('BorrarDatosTesting') IS NOT NULL
     DROP PROCEDURE BorrarDatosTesting
 GO
@@ -662,4 +666,375 @@ AS
 	delete from envio_core_respuesta
 	delete from envio_core_generado
 RETURN 0 
+GO
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
 
+IF object_id('sp_pm_getOfferingParams') IS NOT NULL
+    DROP PROCEDURE sp_pm_getOfferingParams
+GO
+CREATE PROCEDURE sp_pm_getOfferingParams( @result AS varchar(1000) out	)
+AS
+BEGIN
+	--Variables
+	DECLARE 
+			@nombre varchar(255),
+			@path varchar(255),
+			@insertQuery varchar(255),
+			@execQuery varchar(255),
+			@insertQueryb64 varchar(255),
+			@execQueryb64 varchar(255),
+			@ebcdic char
+
+			
+
+	--Parametria correspondiente al archivo
+	SELECT @path = pe_path_archivo, @nombre = pe_nombre_archivo, @ebcdic = pe_ebcdic
+	FROM Batch..parametria_archivos_entrada_interbanking
+	WHERE pe_archivo = 'OFFERING'
+
+	--Query para insertar
+	SELECT @insertQueryb64 = qr_query
+	FROM Batch..backend_querys
+	WHERE qr_archivo = 'OFFERING'
+	and qr_funcion = 'insert'
+	
+	--Query para procesar
+	SELECT @execQueryb64 = qr_query
+	FROM Batch..backend_querys
+	WHERE qr_archivo = 'OFFERING'
+	and qr_funcion = 'process'
+
+	--Desencripto los querys
+	select @insertQuery = Batch.dbo.fn_str_FROM_BASE64(@insertQueryb64);
+	select @execQuery = Batch.dbo.fn_str_FROM_BASE64(@execQueryb64);
+
+	--Armado de string para que el batch parsee
+	SET @result = @nombre + '|' + @path + '|' + @ebcdic + '|' + @insertQuery + '|' + @execQuery  
+
+	--Vuelvo a encriptar y las recibe el batch
+	SET @result = Batch.dbo.fn_str_TO_BASE64(@result);
+END
+GO
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+IF object_id('sp_batch_process_offering') IS NOT NULL
+    DROP PROCEDURE sp_batch_process_offering
+GO
+CREATE PROCEDURE sp_batch_process_offering
+--( @proceso varchar(100) ) FALTA GENERALIZAR los procesos
+AS
+BEGIN
+	DECLARE
+		@subproceso varchar(20),
+		@query nvarchar(255),
+		@id int,
+		@total int,
+		@actual int,
+		@result int
+
+	--Inicializacion
+	SET @total = 0
+	SET @actual = 0
+	SET @id = 0
+
+	--Me fijo en la tabla de logeo si ya hice alguno hoy
+	SELECT @subproceso = lp_subproceso, @query = lp_query
+	FROM log_procesos_ejecutados
+	--WHERE lp_proceso = @proceso
+	WHERE lp_proceso = 'OFFERING'
+	AND CAST(lp_fecha_ejecucion AS DATE) = CAST(GETDATE() as DATE)
+
+	--Busco el total para escribir menos
+	SELECT	@total = count(*)
+	FROM	planificacion_procesos_detalle
+	WHERE	pp_estado = 'A'
+	AND		pp_proceso = 'OFFERING'
+	GROUP BY pp_proceso
+
+	--No procese nada ni se rompio en el medio
+	if @subproceso IS NULL
+	BEGIN
+		WHILE(1=1)
+		BEGIN
+
+			--Busco en la tabla de proceso que es lo que tengo que hacer
+			SELECT	top 1 @id = pp_id, @query = pp_query, @subproceso = pp_subproceso
+			FROM	planificacion_procesos_detalle
+			WHERE	pp_proceso = 'OFFERING'
+			and		pp_estado = 'A'
+			and		pp_id > @actual
+			ORDER BY pp_id asc
+
+			--Corro el query que me traje
+			exec sp_executesql @query
+
+			--Aumento una vez que corri
+			SET @actual = @actual + 1
+
+			--Logeo la operacion
+			INSERT INTO log_procesos_ejecutados 
+			--VALUES (@proceso,@subproceso,@query,GETDATE())
+			VALUES ('OFFERING',@subproceso,@query,GETDATE())
+
+			--Me fijo si tengo que cortar
+			IF @total = @actual BREAK
+		END
+	END
+	--ELSE -- Hay algo que reprocesar
+
+END
+
+GO
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+IF object_id('sp_batch_read_offering') IS NOT NULL
+    DROP PROCEDURE sp_batch_read_offering
+GO
+CREATE PROCEDURE sp_batch_read_offering
+AS
+BEGIN
+	DECLARE 
+		@aux varchar(max),
+		@id int,
+		@total int,
+		@actual int
+
+	--Inicializacion
+	SET @total = 0
+	SET @actual = 0
+
+	--Antes que nada, hago el truncate de la tabla en la que voy a insertar
+	TRUNCATE TABLE dn_offering
+
+	--Busco el total para escribir menos
+	SELECT	@total = count(*)
+	FROM	archivo_procesado
+	WHERE	ap_procesado = 'N'
+	AND		ap_archivo = 'OFFERING'
+	AND		SUBSTRING(ap_string,1,1) = '2' --Aca estoy filtrando los header y footer
+	GROUP BY ap_archivo
+
+	--Empiezo a traer
+	SELECT top 1 @aux = ap_string, @id = ap_id
+	FROM archivo_procesado 
+	WHERE ap_procesado = 'N'
+	AND ap_archivo = 'OFFERING'
+	and SUBSTRING(ap_string,1,1) = '2' --Aca estoy filtrando los header y footer
+	ORDER BY ap_id asc
+
+	WHILE (1=1)
+	BEGIN
+		--Inserto en la tabla correspondiente
+		INSERT INTO dn_offering
+			values (
+					SUBSTRING(@aux,2,7), --[COD_ABONADO]
+					SUBSTRING(@aux,9,13), --[CUENTA]
+					SUBSTRING(@aux,22,10) --[COD_OFFERING]
+				   )
+
+		--Marco el registro para no volver a procesarlo
+		UPDATE archivo_procesado SET ap_procesado = 'S' WHERE ap_id = @id
+
+		--Aumento una vez que corri
+		SET @actual = @actual + 1
+
+		--Hay que corregir este break porque me inserta una fila de nulls
+		SELECT top 1 @aux = ap_string, @id = ap_id
+		FROM archivo_procesado 
+		WHERE ap_procesado = 'N'
+		AND ap_archivo = 'OFFERING'
+		and SUBSTRING(ap_string,1,1) = '2'
+		ORDER BY ap_id asc
+		
+		IF @actual = @total BREAK
+	END
+END
+
+GO
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+IF object_id('sp_pm_getAccountParams') IS NOT NULL
+    DROP PROCEDURE sp_pm_getAccountParams
+GO
+CREATE PROCEDURE sp_pm_getAccountParams( @result AS varchar(1000) out	)
+AS
+BEGIN
+	--Variables
+	DECLARE 
+			@nombre varchar(255),
+			@path varchar(255),
+			@insertQuery varchar(255),
+			@execQuery varchar(255),
+			@insertQueryb64 varchar(255),
+			@execQueryb64 varchar(255),
+			@ebcdic char
+
+			
+
+	--Parametria correspondiente al archivo
+	SELECT @path = pe_path_archivo, @nombre = pe_nombre_archivo, @ebcdic = pe_ebcdic
+	FROM Batch..parametria_archivos_entrada_interbanking
+	WHERE pe_archivo = 'ACCOUNT'
+
+	--Query para insertar
+	SELECT @insertQueryb64 = qr_query
+	FROM Batch..backend_querys
+	WHERE qr_archivo = 'ACCOUNT'
+	and qr_funcion = 'insert'
+	
+	--Query para procesar
+	SELECT @execQueryb64 = qr_query
+	FROM Batch..backend_querys
+	WHERE qr_archivo = 'ACCOUNT'
+	and qr_funcion = 'process'
+
+	--Desencripto los querys
+	select @insertQuery = Batch.dbo.fn_str_FROM_BASE64(@insertQueryb64);
+	select @execQuery = Batch.dbo.fn_str_FROM_BASE64(@execQueryb64);
+
+	--Armado de string para que el batch parsee
+	SET @result = @nombre + '|' + @path + '|' + @ebcdic + '|' + @insertQuery + '|' + @execQuery  
+
+	--Vuelvo a encriptar y las recibe el batch
+	SET @result = Batch.dbo.fn_str_TO_BASE64(@result);
+END
+GO
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+IF object_id('sp_batch_process_account') IS NOT NULL
+    DROP PROCEDURE sp_batch_process_account
+GO
+CREATE PROCEDURE sp_batch_process_account
+--( @proceso varchar(100) ) FALTA GENERALIZAR los procesos
+AS
+BEGIN
+	DECLARE
+		@subproceso varchar(20),
+		@query nvarchar(255),
+		@id int,
+		@total int,
+		@actual int,
+		@result int
+
+	--Inicializacion
+	SET @total = 0
+	SET @actual = 0
+	SET @id = 0
+
+	--Me fijo en la tabla de logeo si ya hice alguno hoy
+	SELECT @subproceso = lp_subproceso, @query = lp_query
+	FROM log_procesos_ejecutados
+	--WHERE lp_proceso = @proceso
+	WHERE lp_proceso = 'ACCOUNT'
+	AND CAST(lp_fecha_ejecucion AS DATE) = CAST(GETDATE() as DATE)
+
+	--Busco el total para escribir menos
+	SELECT	@total = count(*)
+	FROM	planificacion_procesos_detalle
+	WHERE	pp_estado = 'A'
+	AND		pp_proceso = 'ACCOUNT'
+	GROUP BY pp_proceso
+
+	--No procese nada ni se rompio en el medio
+	if @subproceso IS NULL
+	BEGIN
+		WHILE(1=1)
+		BEGIN
+
+			--Busco en la tabla de proceso que es lo que tengo que hacer
+			SELECT	top 1 @id = pp_id, @query = pp_query, @subproceso = pp_subproceso
+			FROM	planificacion_procesos_detalle
+			WHERE	pp_proceso = 'ACCOUNT'
+			and		pp_estado = 'A'
+			and		pp_id > @actual
+			ORDER BY pp_id asc
+
+			--Corro el query que me traje
+			exec sp_executesql @query
+
+			--Aumento una vez que corri
+			SET @actual = @actual + 1
+
+			--Logeo la operacion
+			INSERT INTO log_procesos_ejecutados 
+			--VALUES (@proceso,@subproceso,@query,GETDATE())
+			VALUES ('ACCOUNT',@subproceso,@query,GETDATE())
+
+			--Me fijo si tengo que cortar
+			IF @total = @actual BREAK
+		END
+	END
+	--ELSE -- Hay algo que reprocesar
+
+END
+
+GO
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+IF object_id('sp_batch_read_account') IS NOT NULL
+    DROP PROCEDURE sp_batch_read_account
+GO
+CREATE PROCEDURE sp_batch_read_account
+AS
+BEGIN
+	DECLARE 
+		@aux varchar(max),
+		@id int,
+		@total int,
+		@actual int
+
+	--Inicializacion
+	SET @total = 0
+	SET @actual = 0
+
+	--Antes que nada, hago el truncate de la tabla donde vamos a insertar
+	TRUNCATE TABLE dn_abonados_cuentas
+
+	--Busco el total para escribir menos
+	SELECT	@total = count(*)
+	FROM	archivo_procesado
+	WHERE	ap_procesado = 'N'
+	AND		ap_archivo = 'ACCOUNT'
+	GROUP BY ap_archivo
+
+	--Empiezo a traer
+	SELECT	top 1 @aux = ap_string, @id = ap_id
+	FROM	archivo_procesado 
+	WHERE	ap_procesado = 'N'
+	AND		ap_archivo = 'ACCOUNT'
+	AND		SUBSTRING(ap_string,1,3) = '147'
+	ORDER BY ap_id asc
+
+	WHILE (1=1)
+	BEGIN
+		--Inserto en la tabla correspondiente
+		INSERT INTO dn_abonados_cuentas
+			values (
+					SUBSTRING(@aux,4,7),	--[COD_ABONADO]
+					SUBSTRING(@aux,11,2),	--[TIPO_CUENTA]
+					SUBSTRING(@aux,13,19),	--[CUENTA]
+					SUBSTRING(@aux,32,5),	--[COD_OFFERING]
+					SUBSTRING(@aux,37,1)	--[ACTIVA]
+				   )
+
+		--Marco el registro para no volver a procesarlo
+		UPDATE archivo_procesado SET ap_procesado = 'S' WHERE ap_id = @id
+
+		--Aumento una vez que corri
+		SET @actual = @actual + 1
+
+		--Hay que corregir este break porque me inserta una fila de nulls
+		SELECT	top 1 @aux = ap_string, @id = ap_id
+		FROM	archivo_procesado 
+		WHERE	ap_procesado = 'N'
+		AND		ap_archivo = 'ACCOUNT'
+		AND		SUBSTRING(ap_string,1,3) = '147'
+		AND		ap_id > @id
+		ORDER BY ap_id asc
+		
+		IF @actual = @total BREAK
+	END
+END
+
+GO
