@@ -1,1 +1,7 @@
 *.tlog
+*.obj
+*.obj
+*.obj
+*.tlog
+Backend/DBConnection/Debug/rc.command.1.tlog
+Backend/DBConnection/Debug/mt.write.1.tlog
