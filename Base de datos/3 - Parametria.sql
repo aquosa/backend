@@ -1,8 +1,8 @@
 use Batch
 
 DECLARE @path varchar(255)
---SET @path = 'E:\\AQUOSA\\backend\\Backend\\Debug'
-SET @path  = 'C:\\Banksys\\Batch\\input'
+SET @path = 'E:\\AQUOSA\\backend\\Backend\\Debug'
+--SET @path  = 'C:\\Banksys\\Batch\\input'
 
 --Borro datos de las tablas si ya existen
 TRUNCATE TABLE [dbo].[parametria_archivos_entrada_interbanking]
@@ -29,7 +29,9 @@ INSERT INTO [dbo].[backend_querys] VALUES (Batch.dbo.fn_str_TO_BASE64('exec sp_b
 --Transfer
 INSERT INTO [dbo].[planificacion_procesos_detalle] VALUES ('TRANSFER','LECTURA','exec Batch.dbo.sp_batch_read_transfer',GETDATE(),'Generacion de tabla de transferencias recibidas','A')
 INSERT INTO [dbo].[planificacion_procesos_detalle] VALUES ('TRANSFER','CHECKMAC','exec Batch.dbo.sp_batch_MAC_transfer',GETDATE(),'Chequeo de MAC del archivo transfer','A')
---INSERT INTO [dbo].[planificacion_procesos_detalle] VALUES ('TRANSFER','CONCILIA','exec Batch.dbo.sp_batch_concilia_transfer',GETDATE(),'Conciliacion de transferencias recibidas batch contra las transferencias recibidas online','A')
+INSERT INTO [dbo].[planificacion_procesos_detalle] VALUES ('TRANSFER','CONCILIA1','exec Batch.dbo.sp_batch_concilia_transfer',GETDATE(),'Conciliacion de transferencias recibidas batch contra las transferencias recibidas online','A')
+INSERT INTO [dbo].[planificacion_procesos_detalle] VALUES ('TRANSFER','CONCILIA2','exec Batch.dbo.sp_batch_process_conciliacion',GETDATE(),'Generacion de movimientos a enviar al core despues de la conciliacion','A')
+
 
 --Parametria TRAN  CODE
 INSERT INTO [dbo].[parametria_tran_code] VALUES ('TCE','29','A','Codigo de transaccion para credito')
@@ -37,7 +39,7 @@ INSERT INTO [dbo].[parametria_tran_code] VALUES ('TDE','19','A','Codigo de trans
 INSERT INTO [dbo].[parametria_tran_code] VALUES ('TDEM','40','A','Codigo de transaccion para monobanco')
 
 --Parametria de reglas de validacion
-INSERT INTO [dbo].[parametria_reglas_validacion] VALUES ('TRANSFER','CONCILIA','TCE','ESTADO_BATCH > ESTADO_ONLINE',GETDATE(),'A')
+INSERT INTO [dbo].[parametria_reglas_validacion] VALUES ('TRANSFER','CONCILIA','TCE','BCO_DEBITO NOT IN (147) AND BCO_CREDITO IN (147) AND ESTADO_BATCH in (60,40,50)', GETDATE(), 'A')
 INSERT INTO [dbo].[parametria_reglas_validacion] VALUES ('TRANSFER','CONCILIA','TCER','',GETDATE(),'A')
 INSERT INTO [dbo].[parametria_reglas_validacion] VALUES ('TRANSFER','CONCILIA','TDE','',GETDATE(),'A')
 INSERT INTO [dbo].[parametria_reglas_validacion] VALUES ('TRANSFER','CONCILIA','TDER','',GETDATE(),'A')

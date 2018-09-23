@@ -98,11 +98,13 @@ IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES
            WHERE TABLE_NAME = N'envio_core_generado')
 DROP TABLE envio_core_generado
 CREATE TABLE envio_core_generado (
-ec_id int,
+ec_id int IDENTITY(1,1) PRIMARY KEY,
+ec_nro_transferencia varchar(7),
 ec_string varchar(MAX),
 ec_fecha_ult_modificacion datetime,
 ec_fecha_generacion datetime,
-ec_estado char
+ec_estado char,
+ec_procesado char default 'N'
 )
 --------------------------------------------------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------------------------------------------------
@@ -110,10 +112,11 @@ IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES
            WHERE TABLE_NAME = N'envio_core_respuesta')
 DROP TABLE envio_core_respuesta
 CREATE TABLE envio_core_respuesta (
-er_id int,
+er_id int IDENTITY (1,1),
 er_string varchar(MAX),
 er_fecha_ult_modificacion datetime,
-er_proceso varchar(100)
+er_proceso varchar(100),
+er_procesado char default 'N'
 )
 --------------------------------------------------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------------------------------------------------
@@ -135,7 +138,7 @@ DROP TABLE dn_tef_recibidas
 CREATE TABLE [dbo].[dn_tef_recibidas](
 	[BCO_DEBITO] [char](3) NULL,
 	[FEC_SOLICITUD] [char](8) NULL,
-	[NRO_TRANSFERENCIA] [char](7) NOT NULL,
+	[NRO_TRANSFERENCIA] [char](7) NULL,
 	[COD_ABONADO] [char](7) NULL,
 	[TIPO_OPERACION] [char](2) NULL,
 	[IMPORTE] [char](17) NULL,
@@ -206,7 +209,7 @@ CREATE TABLE log_procesos_ejecutados(
 lp_id  int IDENTITY(1,1) PRIMARY KEY,
 lp_proceso varchar(255),
 lp_subproceso varchar(255),
-lp_query varchar(255),
+lp_query varchar(MAX),
 lp_fecha_ejecucion datetime
 )
 --------------------------------------------------------------------------------------------------------------------------------
@@ -241,7 +244,7 @@ DROP TABLE dn_tef_conciliacion
 CREATE TABLE dn_tef_conciliacion(
 	[BCO_DEBITO] [char](3) NULL,
 	[FEC_SOLICITUD] [char](8) NULL,
-	[NRO_TRANSFERENCIA] [char](7) NOT NULL,
+	[NRO_TRANSFERENCIA] [char](7) NULL,
 	[COD_ABONADO] [char](7) NULL,
 	[TIPO_OPERACION] [char](2) NULL,
 	[IMPORTE] [char](17) NULL,
@@ -289,7 +292,8 @@ CREATE TABLE dn_tef_conciliacion(
 	[CTA_ESP] [char] (1) NULL,
 	[CUITOR] [char] (11) NULL,
 	[CUITCR] [char] (11) NULL,
-	[ESTADO_PROCESAMIENTO] char(1) NULL default 'P'
+	[ESTADO_PROCESAMIENTO] char(1) NULL default 'P',
+	[ESTADO_CORE] [char](2) NULL
 	)
 --------------------------------------------------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------------------------------------------------
@@ -299,7 +303,7 @@ DROP TABLE dn_tef_online
 CREATE TABLE dn_tef_online(
 	[BCO_DEBITO] [char](3) NULL,
 	[FEC_SOLICITUD] [char](8) NULL,
-	[NRO_TRANSFERENCIA] [char](7) NOT NULL,
+	[NRO_TRANSFERENCIA] [char](7) NULL,
 	[COD_ABONADO] [char](7) NULL,
 	[TIPO_OPERACION] [char](2) NULL,
 	[IMPORTE] [char](17) NULL,
@@ -352,7 +356,7 @@ IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES
            WHERE TABLE_NAME = N'dn_tef_a_enviar')
 DROP TABLE dn_tef_a_enviar
 CREATE TABLE dn_tef_a_enviar(
-	[NRO_TRANSFERENCIA] [char](7) NOT NULL,
+	[NRO_TRANSFERENCIA] [char](7) NULL,
 	[FEC_SOLICITUD] [char](8) NULL,
 	[BCO_DEBITO] [char](3) NULL,
 	[BCO_CREDITO] [char](3) NULL,

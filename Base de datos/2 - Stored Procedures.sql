@@ -1,4 +1,5 @@
 Use Batch
+
 --------------------------------------------------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------------------------------------------------
 IF object_id('sp_pm_getTransferParams') IS NOT NULL
@@ -158,6 +159,7 @@ BEGIN
 	--Inicializacion
 	SET @total = 0
 	SET @actual = 0
+	SET @id = 0
 
 	--Me fijo en la tabla de logeo si ya hice alguno hoy
 	SELECT @subproceso = lp_subproceso, @query = lp_query
@@ -179,10 +181,11 @@ BEGIN
 		BEGIN
 
 			--Busco en la tabla de proceso que es lo que tengo que hacer
-			SELECT top 1 @id = pp_id, @query = pp_query
+			SELECT top 1 @id = pp_id, @query = pp_query, @subproceso = pp_subproceso
 			FROM planificacion_procesos_detalle
 			WHERE pp_proceso = 'TRANSFER'
 			and pp_estado = 'A'
+			and pp_id > @actual
 			ORDER BY pp_id asc
 
 			--Corro el query que me traje
@@ -217,7 +220,7 @@ BEGIN
 	DECLARE 
 	@campos_tef_enviar varchar(255),
 	@filler	varchar(365),
-	@query varchar(max),
+	@query nvarchar(max),
 	@reglaCreditos varchar(max),
 	@tranCodeCredito varchar(10),
 	@reglaReversoCreditos varchar(max),
@@ -255,6 +258,7 @@ BEGIN
 	-- Borro todo lo que hay en la tabla de conciliacion
 	TRUNCATE TABLE dn_tef_conciliacion
 
+	--TODO: esto va en otro sp
 	-- Inserto TEF ONLINE en TEF CONCILIACION
 	INSERT INTO dn_tef_conciliacion
 	(	[BCO_DEBITO],[FEC_SOLICITUD],[NRO_TRANSFERENCIA],[COD_ABONADO],[TIPO_OPERACION],[IMPORTE],[SUC_DEBITO],[NOM_SOLICITANTE],[TIPO_CTA_DEB_RED],
@@ -297,11 +301,19 @@ BEGIN
 		[OPERADOR_INGRESO],[AUTORIZANTE_1],[AUTORIZANTE_2],[AUTORIZANTE_3],[FECHA_AUTORIZACION],[HORA_AUTORIZACION],[ESTADO],[FEC_ESTADO],
 		[OBSERVACION_1],[OBSERVACION_2],[CLAVE_MAC_1],[CLAVE_MAC_2],[NRO_REFERENCIA],[NRO_ENVIO],[DEB_CONSOLIDADO],[TIPO_TITULAR],[PAGO_PREACORDADO],
 		[RIESGO_ABONADO],[RIESGO_BANCO],[ESTADOS_ANTERIORES],[CTA_ESP],[CUITOR],[CUITCR]
-	FROM dn_tef_recibidas
-	WHERE dn_tef_recibidas.NRO_TRANSFERENCIA not in (
+	FROM	dn_tef_recibidas
+	WHERE	dn_tef_recibidas.NRO_TRANSFERENCIA not in (
 														SELECT NRO_TRANSFERENCIA 
 														FROM dn_tef_conciliacion
-													)
+														)
+--------------------------------------------------------------------------------------------
+--FML:
+--	Si no tiene estado online, se le pega el estado batch
+--------------------------------------------------------------------------------------------
+	UPDATE	dn_tef_conciliacion
+	SET ESTADO_ONLINE = ESTADO_BATCH
+	WHERE ESTADO_ONLINE is NUll
+
 --------------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------------
 	-- CREDITOS (TCE)
@@ -314,9 +326,9 @@ BEGIN
 	AND		rv_estado = 'A'
 	
 	-- Seteo el Query que voy a ejecutar
-	SET @query = ' 	INSERT INTO dn_tef_a_enviar [NRO_TRANSFERENCIA], [FEC_SOLICITUD], [BCO_DEBITO], [BCO_CREDITO],
-												[NRO_REFERENCIA], [CTA_DEBITO], [CTA_CREDITO], [IMPORTE], [TIPO_MOVIMIENTO] , [TRAN_CODE]
-					SELECT ' + @campos_tef_enviar + @tranCodeCredito + ' FROM dn_tef_conciliacion 
+	SET @query = ' 	INSERT INTO batch.dbo.dn_tef_a_enviar ([NRO_TRANSFERENCIA], [FEC_SOLICITUD], [BCO_DEBITO], [BCO_CREDITO],
+												           [NRO_REFERENCIA], [CTA_DEBITO], [CTA_CREDITO], [IMPORTE], [TIPO_MOVIMIENTO], [TRAN_CODE])
+					SELECT ' + @campos_tef_enviar + ', ' + @tranCodeCredito + ' FROM dn_tef_conciliacion 
 					WHERE ' + @reglaCreditos
 
 	-- Ejecuto el query
@@ -324,79 +336,79 @@ BEGIN
 					
 	--Logeo la operacion
 	INSERT INTO log_procesos_ejecutados 
-	VALUES (@proceso,@subproceso,@query,GETDATE())
+	VALUES ('TRANSFER','TCE '+@subproceso,@query,GETDATE())
 
 --------------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------------
-	-- REVERSO CREDITOS (TCER)
-	-- Busco regla para reverso de creditos
-	SELECT @reglaReversoCreditos = rv_regla
-	FROM	parametria_reglas_validacion
-	WHERE	rv_tipo = 'TCER'
-	AND		rv_proceso = @proceso
-	AND		rv_subproceso = @subproceso
-	AND		rv_estado = 'A'
+--	-- REVERSO CREDITOS (TCER)
+--	-- Busco regla para reverso de creditos
+--	SELECT @reglaReversoCreditos = rv_regla
+--	FROM	parametria_reglas_validacion
+--	WHERE	rv_tipo = 'TCER'
+--	AND		rv_proceso = @proceso
+--	AND		rv_subproceso = @subproceso
+--	AND		rv_estado = 'A'
 	
-	-- Seteo el Query que voy a ejecutar
-	SET @query = ' 	INSERT INTO dn_tef_a_enviar [NRO_TRANSFERENCIA], [FEC_SOLICITUD], [BCO_DEBITO], [BCO_CREDITO],
-												[NRO_REFERENCIA], [CTA_DEBITO], [CTA_CREDITO], [IMPORTE], [TIPO_MOVIMIENTO] , [TRAN_CODE]
-					SELECT ' + @campos_tef_enviar + @tranCodeCredito + ' FROM dn_tef_conciliacion 
-					WHERE ' + @reglaReversoCreditos
+--	-- Seteo el Query que voy a ejecutar
+--	SET @query = ' 	INSERT INTO dn_tef_a_enviar ([NRO_TRANSFERENCIA], [FEC_SOLICITUD], [BCO_DEBITO], [BCO_CREDITO],
+--												 [NRO_REFERENCIA], [CTA_DEBITO], [CTA_CREDITO], [IMPORTE], [TIPO_MOVIMIENTO] , [TRAN_CODE])
+--					SELECT ' + @campos_tef_enviar  + ', ' +  @tranCodeCredito + ' FROM dn_tef_conciliacion 
+--					WHERE ' + @reglaReversoCreditos
 
-	-- Ejecuto el query
-	EXEC sp_executesql @query
+--	-- Ejecuto el query
+--	EXEC sp_executesql @query
 
-	--Logeo la operacion
-	INSERT INTO log_procesos_ejecutados 
-	VALUES (@proceso,@subproceso,@query,GETDATE())
+--	--Logeo la operacion
+--	INSERT INTO log_procesos_ejecutados 
+--	VALUES (@proceso,@subproceso,@query,GETDATE())
 
---------------------------------------------------------------------------------------------
---------------------------------------------------------------------------------------------
-	-- DEBITOS (TDE)
-	-- Busco regla para creditos
-	SELECT @reglaDebitos = rv_regla
-	FROM	parametria_reglas_validacion
-	WHERE	rv_tipo = 'TDE'
-	AND		rv_proceso = @proceso
-	AND		rv_subproceso = @subproceso
-	AND		rv_estado = 'A'
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+--	-- DEBITOS (TDE)
+--	-- Busco regla para creditos
+--	SELECT @reglaDebitos = rv_regla
+--	FROM	parametria_reglas_validacion
+--	WHERE	rv_tipo = 'TDE'
+--	AND		rv_proceso = @proceso
+--	AND		rv_subproceso = @subproceso
+--	AND		rv_estado = 'A'
 	
-	-- Seteo el Query que voy a ejecutar
-	SET @query = ' 	INSERT INTO dn_tef_a_enviar [NRO_TRANSFERENCIA], [FEC_SOLICITUD], [BCO_DEBITO], [BCO_CREDITO],
-												[NRO_REFERENCIA], [CTA_DEBITO], [CTA_CREDITO], [IMPORTE], [TIPO_MOVIMIENTO], [TRAN_CODE] 
-					SELECT ' + @campos_tef_enviar + @tranCodeCredito + ' FROM dn_tef_conciliacion 
-					WHERE ' + @reglaDebitos
+--	-- Seteo el Query que voy a ejecutar
+--	SET @query = ' 	INSERT INTO dn_tef_a_enviar ([NRO_TRANSFERENCIA], [FEC_SOLICITUD], [BCO_DEBITO], [BCO_CREDITO],
+--												 [NRO_REFERENCIA], [CTA_DEBITO], [CTA_CREDITO], [IMPORTE], [TIPO_MOVIMIENTO], [TRAN_CODE] )
+--					SELECT ' + @campos_tef_enviar  + ', ' +  @tranCodeDebito + ' FROM dn_tef_conciliacion 
+--					WHERE ' + @reglaDebitos
 
-	-- Ejecuto el query
-	EXEC sp_executesql @query
+--	-- Ejecuto el query
+--	EXEC sp_executesql @query
 					
-	--Logeo la operacion
-	INSERT INTO log_procesos_ejecutados 
-	VALUES (@proceso,@subproceso,@query,GETDATE())
+--	--Logeo la operacion
+--	INSERT INTO log_procesos_ejecutados 
+--	VALUES (@proceso,@subproceso,@query,GETDATE())
 
---------------------------------------------------------------------------------------------
---------------------------------------------------------------------------------------------
-	-- REVERSO CREDITOS (TDER)
-	-- Busco regla para reverso de creditos
-	SELECT @reglaReversoDebitos = rv_regla
-	FROM	parametria_reglas_validacion
-	WHERE	rv_tipo = 'TDER'
-	AND		rv_proceso = @proceso
-	AND		rv_subproceso = @subproceso
-	AND		rv_estado = 'A'
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
+--	-- REVERSO CREDITOS (TDER)
+--	-- Busco regla para reverso de creditos
+--	SELECT @reglaReversoDebitos = rv_regla
+--	FROM	parametria_reglas_validacion
+--	WHERE	rv_tipo = 'TDER'
+--	AND		rv_proceso = @proceso
+--	AND		rv_subproceso = @subproceso
+--	AND		rv_estado = 'A'
 	
-	-- Seteo el Query que voy a ejecutar
-	SET @query = ' 	INSERT INTO dn_tef_a_enviar [NRO_TRANSFERENCIA], [FEC_SOLICITUD], [BCO_DEBITO], [BCO_CREDITO],
-												[NRO_REFERENCIA], [CTA_DEBITO], [CTA_CREDITO], [IMPORTE], [TIPO_MOVIMIENTO] , [TRAN_CODE]
-					SELECT ' + @campos_tef_enviar + @tranCodeCredito + ' FROM dn_tef_conciliacion 
-					WHERE ' + @reglaReversoDebitos
+--	-- Seteo el Query que voy a ejecutar
+--	SET @query = ' 	INSERT INTO dn_tef_a_enviar ([NRO_TRANSFERENCIA], [FEC_SOLICITUD], [BCO_DEBITO], [BCO_CREDITO],
+--												 [NRO_REFERENCIA], [CTA_DEBITO], [CTA_CREDITO], [IMPORTE], [TIPO_MOVIMIENTO] , [TRAN_CODE])
+--					SELECT ' + @campos_tef_enviar  + ', ' +  @tranCodeDebito + ' FROM dn_tef_conciliacion 
+--					WHERE ' + @reglaReversoDebitos
 
-	-- Ejecuto el query
-	EXEC sp_executesql @query
+--	-- Ejecuto el query
+--	EXEC sp_executesql @query
 	
-	--Logeo la operacion
-	INSERT INTO log_procesos_ejecutados 
-	VALUES (@proceso,@subproceso,@query,GETDATE())
+--	--Logeo la operacion
+--	INSERT INTO log_procesos_ejecutados 
+--	VALUES (@proceso,@subproceso,@query,GETDATE())
 
 --------------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------------
@@ -482,11 +494,55 @@ GO
 IF object_id('sp_batch_process_core_respuesta') IS NOT NULL
     DROP PROCEDURE sp_batch_process_core_respuesta
 GO
-CREATE PROCEDURE sp_batch_process_core_respuesta (@result as varchar(8000) out)
+CREATE PROCEDURE sp_batch_process_core_respuesta 
 AS 
 BEGIN
 
-SELECT 1 from parametria_tran_code
+DECLARE 
+		@aux varchar(max),
+		@id int,
+		@nro_transferencia varchar(12),
+		@estado varchar(2)
+
+
+	SELECT top 1 @aux = er_string, @id = er_id
+	FROM envio_core_respuesta 
+	WHERE er_procesado = 'N'
+	--AND ap_archivo = 'TRANSFER' TODO: VERIFICAR SI HACEN FALTA ESTOS DOS
+	--and SUBSTRING(ap_string,1,1) = '2' --Aca estoy filtrando los header y footer
+	ORDER BY er_id asc
+
+	--Para mejorar performance, lo asigno a una variable asi no ando recortando todo el tiempo
+	SET @nro_transferencia = SUBSTRING(@aux, 217, 12);
+	SET @estado = ltrim(rtrim(SUBSTRING(@aux, 318, 3)));
+
+	WHILE (1=1)
+	BEGIN
+		--1 -	Updateo el estado en dn_tef_conciliacion
+		UPDATE	dn_tef_conciliacion
+		SET		ESTADO_PROCESAMIENTO = 'S',
+				ESTADO_CORE = @estado
+		WHERE	NRO_TRANSFERENCIA = @nro_transferencia		
+
+		--2	-	Marco el envío como hecho
+		UPDATE	envio_core_generado
+		SET		ec_procesado =  'S'
+		WHERE	ec_nro_transferencia =  @nro_transferencia --TODO: mejorar haciendole un indice a esta tabla
+
+		--3	-	Marco el registro como ya procesado para no volver a tomarlo
+		UPDATE envio_core_respuesta SET er_procesado = 'S' WHERE er_id = @id
+
+		--Esto lo necesito para el break
+		SET @aux = NULL
+
+		--TODO: Hay que corregir este break porque me inserta una fila de nulls
+		SELECT top 1 @aux = er_string, @id = er_id
+		FROM envio_core_respuesta 
+		WHERE er_procesado = 'N'
+		ORDER BY er_id asc
+		
+		IF @@ROWCOUNT = 0 BREAK
+	END
 	
 END
 GO
@@ -495,7 +551,7 @@ GO
 IF object_id('sp_batch_process_conciliacion') IS NOT NULL
     DROP PROCEDURE sp_batch_process_conciliacion
 GO
-CREATE PROCEDURE sp_batch_process_conciliacion (@result as varchar(8000) out)
+CREATE PROCEDURE sp_batch_process_conciliacion 
 AS
 BEGIN
 
@@ -514,7 +570,7 @@ BEGIN
 	AND dn_tef_conciliacion.FEC_SOLICITUD = dn_tef_a_enviar.FEC_SOLICITUD
 
 	-- Ahora que tengo todos los campos completos, armo un string gigante y lo meto en la tabla correspondiente
-	INSERT INTO envio_core_generado (ec_fecha_generacion, ec_fecha_ult_modificacion, ec_estado, ec_string)
+	INSERT INTO envio_core_generado (ec_fecha_generacion, ec_fecha_ult_modificacion, ec_estado, ec_string, ec_nro_transferencia)
 	SELECT GETDATE(), GETDATE(), 'P', CONCAT(		
 												'000000',														--	chBLOCK_INI_TLF	0	000000
 												'HOST24',														--	PREFIX1	6	HOST24
@@ -577,7 +633,33 @@ BEGIN
 												'00',															--	RVSL_RSN	2	00
 												'0000000000000000',												--	PIN_OFST	16	0000000000000000
 												'0',															--	SHRG_GRP	1	0
-												FILLER)															--	FILLER4	365	N + XXXX + XXX
+												FILLER),														--	FILLER4	365	N + XXXX + XXX
+												NRO_TRANSFERENCIA
 					FROM dn_tef_a_enviar
 END
 GO
+
+IF object_id('sp_batch_MAC_transfer') IS NOT NULL
+    DROP PROCEDURE sp_batch_MAC_transfer
+GO
+CREATE PROCEDURE dbo.sp_batch_MAC_transfer 
+AS
+BEGIN 
+RETURN 0 
+END
+GO
+
+IF object_id('BorrarDatosTesting') IS NOT NULL
+    DROP PROCEDURE BorrarDatosTesting
+GO
+CREATE PROCEDURE dbo.BorrarDatosTesting 
+AS
+    delete from dn_tef_recibidas
+    delete from archivo_procesado
+    delete from log_procesos_ejecutados
+	delete from dn_tef_conciliacion
+	delete from dn_tef_a_enviar
+	delete from envio_core_respuesta
+	delete from envio_core_generado
+RETURN 0 
+

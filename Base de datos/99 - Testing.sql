@@ -1,27 +1,16 @@
+use batch
 
-exec batch.dbo.sp_batch_process 'TRANSFER'
+--select * from dn_tef_recibidas
+--select * from archivo_procesado
+--select * from dn_tef_conciliacion
+--select * from dn_tef_a_enviar
 
-DECLARE @query nvarchar(MAX)
-SET @query = 'exec batch.dbo.sp_batch_read_transfer'
-exec sp_executesql @query
+--select * from log_procesos_ejecutados
 
-
-select * from log_procesos_ejecutados
-select * from planificacion_procesos_detalle
-select * from archivo_procesado
-select * from dn_tef_recibidas
-
-truncate table dn_tef_recibidas
-truncate table log_procesos_ejecutados
-
-update archivo_procesado set ap_procesado = 'N'
-
-DECLARE 
-	@result varchar(max)
-exec sp_pm_getConnectorParams @result out
-select @result
+--exec BorrarDatosTesting
 
 
-
-
-select *  from planificacion_procesos_detalle
+--exec Batch.dbo.sp_batch_read_transfer
+--exec Batch.dbo.sp_batch_MAC_transfer
+exec Batch.dbo.sp_batch_concilia_transfer
+exec Batch.dbo.sp_batch_process_conciliacion
